@@ -2,10 +2,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 typedef uint8_t bool;
 #define true 1
 #define false 0
+#define TWELVE_BITS_CONVERSION 3/2
 
 typedef struct {
     uint8_t BootJumpInstruction[3]; //bdb_oem:                    db 'MSWIN4.1'
@@ -95,6 +97,23 @@ DirectoryEntry* findFile(const char* name) {
 bool readFile(DirectoryEntry* fileEntry, FILE* disk, uint8_t* outputBuffer) {
     bool success = true;
     uint16_t currentCluster = fileEntry -> firstClusterLow;
+
+    do {
+        uint32_t lba = g_RootDirectoryEnd + (currentCluster - 2) * g_BootSector.sectorsPerCluster;
+        success = success && readSectors(disk, lba, g_BootSector.sectorsPerCluster, outputBuffer);
+        outputBuffer += g_BootSector.sectorsPerCluster * g_BootSector.bytesPerSector;
+
+        uint32_t fatIndex = currentCluster * TWELVE_BITS_CONVERSION;
+        if (currentCluster % 2 == 0) {
+            currentCluster = (*(uint16_t*)(g_Fat + fatIndex)) & 0x0FFF;
+        } else {
+            currentCluster = (*(uint16_t*)(g_Fat + fatIndex)) >> 4;
+        }
+
+
+    } while (success && currentCluster < 0x0FF8);
+
+    return success;
 }
 
 int main(int argc, char** argv){ // argv arguments are [0] - disk image [1] - file name
@@ -136,6 +155,24 @@ int main(int argc, char** argv){ // argv arguments are [0] - disk image [1] - fi
         return -5;
     }
 
+    uint8_t* buffer = (uint8_t*) malloc(fileEntry->size + g_BootSector.bytesPerSector);
+    if(!readFile(fileEntry, disk, buffer)){
+        fprintf(stderr, "Error reading file data\n");
+        free(buffer);
+        free(g_Fat);
+        free(g_RootDirectory);
+        return -6;
+    }
+
+    for (size_t i = 0; i < fileEntry->size; i++){
+        if (isprint(buffer[i])) {
+            fputc(buffer[i], stdout);
+        } else {
+            printf("%02x", buffer[i]);
+        }
+    }
+
+    free(buffer);
     free(g_Fat);
     free(g_RootDirectory);
     return 0;
