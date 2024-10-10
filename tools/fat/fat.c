@@ -92,6 +92,11 @@ DirectoryEntry* findFile(const char* name) {
     return NULL;
 }
 
+bool readFile(DirectoryEntry* fileEntry, FILE* disk, uint8_t* outputBuffer) {
+    bool success = true;
+    uint16_t currentCluster = fileEntry -> firstClusterLow;
+}
+
 int main(int argc, char** argv){ // argv arguments are [0] - disk image [1] - file name
     if (argc < 3) {
         printf("too few arguments there should be 2, [0] - disk image, [1] - file name\n");
