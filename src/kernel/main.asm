@@ -1,4 +1,4 @@
-org 0x7C00 ; directive that states address - 0x7c00 is deafult os boot address 
+org 0x0 ; directive that states address - 0x7c00 is deafult os boot address 
 bits 16 ; directive that it's written in 16 bits
 
 %define ENDL 0x0D, 0x0A
@@ -27,9 +27,14 @@ bits 16 ; directive that it's written in 16 bits
 ; -----------------------------------CODE----------------------------------
 
 start:
-    jmp main
+    mov si, msg_hello
+    call print
 
-    
+.halt:
+    cli
+    hlt 
+
+
 ; Prints string to a screen
 ; Params:
 ; - ds:si pointer to the string
@@ -53,25 +58,4 @@ print:
     pop si
     ret
 
-main:
-    ; data segments - ds, es
-    mov ax, 0
-    mov ds, ax
-    mov es, ax
-
-    ; stack init
-    mov ss, ax
-    mov sp, 0x7C00 ; is put at the begining of an os as it grows downwords
-    
-    mov si, msg_hello
-    call print
-
-    hlt
-
-.halt:
-    jmp .halt
-
-msg_hello: db 'Hello world!', ENDL, 0
-
-times 510 - ($ - $$) db 0 ; signature write
-dw 0AA55h
+msg_hello: db 'Hello world from kernel!', ENDL, 0

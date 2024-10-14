@@ -56,7 +56,175 @@ ebr_system_id:              db 'FAT12   '           ; 8 bytes
 ; -----------------------------------CODE----------------------------------
 
 start:
-    jmp main
+    ; data segments - ds, es
+    mov ax, 0
+    mov ds, ax
+    mov es, ax
+
+    ; stack init
+    mov ss, ax
+    mov sp, 0x7C00 ; is put at the begining of an os as it grows downwords
+    
+    ; making sure address 0x7c00 is an offset not the address
+    push es
+    push word .after
+    retf
+
+.after:
+    ; read test
+    mov [ebr_drive_number], dl
+
+    mov si, msg_loading
+    call print
+
+    push es
+    mov ah, 08h
+    int 13h
+    jc floppy_error
+    pop es
+
+    ; reading sectors and heads from disk directly using bios
+    and cl, 0x3F
+    xor ch, ch
+    mov [bdb_sector_per_track], cx
+
+    inc dh
+    mov [bdb_heads], dh
+
+    ; read FAT root directory
+    
+    ; compute LBA of root directory
+    mov ax, [bdb_sectors_per_fat]
+    mov bl, [bdb_fat_count]
+    xor bh, bh
+    mul bx
+    add ax, [bdb_reserved_sectors]
+    push ax
+
+    ; compute size of root directory (32 * number of entries) / bytes per sector
+    mov ax, [bdb_dir_entries_count]
+    shl ax, 5
+    xor dx, dx
+    div word [bdb_bytes_per_sector]
+
+    test dx, dx                         ; if dx != 0, add 1
+    jz .root_dir_after
+    inc ax
+
+.root_dir_after:
+
+    ; read root directory
+    mov cl, al                          ; cl = number of sectors to read = size of root directory
+    pop ax                              ; ax = LBA of root directory
+    mov dl, [ebr_drive_number]          ; dl = drive number
+    mov bx, buffer                      ; es:bx = buffer
+    call disk_read
+
+    ; search for kernel.bin
+    xor bx, bx
+    mov di, buffer
+
+.search_kernel:
+    mov si, file_kernel_bin
+    mov cx, 11 ; as 11 is a length of a filename in FAT12
+    push di
+    repe cmpsb ; compares si and di bytes for repe(cx) times
+    pop di
+    je .found_kernel
+
+    add di, 32
+    inc bx
+    cmp bx, [bdb_dir_entries_count]
+    jl .search_kernel
+
+    jmp kernel_not_found_error
+
+.found_kernel:
+    mov ax, [di + 26] ; 26 is offset of the first cluster
+    mov [kernel_cluster], ax
+
+    ; load FAR from disk into memory
+    mov ax, [bdb_reserved_sectors]
+    mov bx, buffer
+    mov cl, [bdb_sectors_per_fat]
+    mov dl, [ebr_drive_number]
+    call disk_read
+
+    ; read kernel
+    mov bx, kernel_load_segment
+    mov es, bx
+    mov bx, kernel_load_offset
+
+.load_kernel_loop:
+
+    mov ax, [kernel_cluster]
+    add ax, 31
+    mov cl, 1
+    mov dl, [ebr_drive_number]
+    call disk_read
+
+    add bx, [bdb_reserved_sectors]
+
+    ; compute next cluster
+    mov ax, [kernel_cluster]
+    mov cx, 3
+    mul cx
+    mov cx, 2
+    div cx ; ax now an entry, dx now a mod 2
+
+    mov si, buffer
+    add si, ax
+    mov ax, [ds:si]
+
+    or dx, dx
+    jz .even
+
+.odd:
+    shr ax, 4
+    jmp .next_cluster_after
+
+.even:
+    add ax, 0x0FFF
+
+.next_cluster_after:
+    cmp ax, 0x0FF8
+    jae .read_finished
+
+    mov [kernel_cluster], ax
+    jmp .load_kernel_loop
+
+.read_finished:
+    mov dl, [ebr_drive_number]
+    mov ax, kernel_load_segment
+    mov ds, ax
+    mov es, ax
+    
+    jmp kernel_load_segment:kernel_load_offset
+
+    jmp wait_key_and_reboot
+
+    cli
+    hlt
+
+floppy_error:
+    mov si, msg_read_failed
+    call print
+    jmp wait_key_and_reboot
+
+kernel_not_found_error:
+    mov si, msg_kernel_not_found
+    call print
+    call wait_key_and_reboot
+
+wait_key_and_reboot:
+    mov ah, 0
+    int 16h ; wait for key press
+    jmp 0FFFFh:0 ; jump to begining of BIOS
+
+.halt:
+    cli ; disable interrupts
+    hlt
+
 
 ; Prints string to a screen
 ; Params:
@@ -80,44 +248,6 @@ print:
     pop ax
     pop si
     ret
-
-main:
-    ; data segments - ds, es
-    mov ax, 0
-    mov ds, ax
-    mov es, ax
-
-    ; stack init
-    mov ss, ax
-    mov sp, 0x7C00 ; is put at the begining of an os as it grows downwords
-
-    ; read test
-    mov [ebr_drive_number], dl
-    mov ax, 1
-    mov cl, 1
-    mov bx, 0x7E00
-    call disk_read
-
-
-    mov si, msg_hello
-    call print
-
-    cli
-    hlt
-
-floppy_error:
-    mov si, msg_read_failed
-    call print
-    jmp wait_key_and_reboot
-
-wait_key_and_reboot:
-    mov ah, 0
-    int 16h ; wait for key press
-    jmp 0FFFFh:0 ; jump to begining of BIOS
-
-.halt:
-    cli ; disable interrupts
-    jmp .halt
 
 ;
 ; Disk converstions
@@ -218,8 +348,16 @@ disk_reset:
     popa
     ret
 
-msg_hello: db 'Hello world!', ENDL, 0
+msg_loading: db 'Loading...', ENDL, 0
 msg_read_failed: db 'Read failed', ENDL, 0
+file_kernel_bin: db 'KERNEL  BIN'
+msg_kernel_not_found: db 'Kenrel not found'
+kernel_cluster: dw 0
+
+kernel_load_segment: equ 0x2000
+kernel_load_offset: equ 0
 
 times 510 - ($ - $$) db 0 ; signature write
 dw 0AA55h
+
+buffer:
