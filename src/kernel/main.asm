@@ -3,7 +3,7 @@ bits 16 ; directive that it's written in 16 bits
 
 %define ENDL 0x0D, 0x0A
 
-; --- USEFUL REGISTER ---
+; --- USEFUL REGISTERS ---
 ; CS - currently running code segment (Program counter tells about offset)
 ; DS - data segment
 ; SS - stack segment
