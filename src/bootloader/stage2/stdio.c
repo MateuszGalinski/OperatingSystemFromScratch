@@ -76,41 +76,42 @@ void _cdecl printf(const char* fmt, ...){
     }
 }
 
-// int* printf_number(int* argp, bool sign){
-//     const char g_HexChars[] = "0123456789abcdef";
-//     char buffer[32];
-//     unsigned long long number;
-//     int number_sign = 1;
-//     int pos = 0;
+int* printf_number(int* argp, bool sign){
+    const char g_HexChars[] = "0123456789abcdef";
+    char buffer[32];
+    unsigned long long number;
+    int number_sign = 1;
+    int pos = 0;
 
-//     if (sign){
-//         int n = *argp;
-//         if (n < 0)
-//         {
-//             n = -n;
-//             number_sign = -1;
-//         }
-//         number = (unsigned long long)n;
-//     }
-//     else
-//     {
-//         number = *(unsigned int*)argp;
-//     }
-//     argp++;
+    if (sign){
+        int n = *argp;
+        if (n < 0)
+        {
+            n = -n;
+            number_sign = -1;
+        }
+        number = (unsigned long long)n;
+    }
+    else
+    {
+        number = *(unsigned int*)argp;
+    }
+    argp++;
 
-//     do {
-//         uint32_t rem;
-//         x86_div64_32(number, RADIX_DEC, &number, &rem);
-//         buffer[pos++] = g_HexChars[rem];
-//     } while (number > 0);
+    do {
+        uint32_t rem;
+        rem = number % RADIX_DEC
+        // x86_div64_32(number, RADIX_DEC, &number, &rem);
+        buffer[pos++] = g_HexChars[rem];
+    } while (number > 0);
 
-//     if (sign && number_sign < 0) {
-//         buffer[pos++] = '-';
-//     }
+    if (sign && number_sign < 0) {
+        buffer[pos++] = '-';
+    }
 
-//     while (--pos >= 0) {
-//         putc(buffer[pos]);
-//     }
+    while (--pos >= 0) {
+        putc(buffer[pos]);
+    }
 
-//     return argp;
-// }
+    return argp;
+}
