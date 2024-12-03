@@ -104,6 +104,7 @@ bool readFile(DirectoryEntry* fileEntry, FILE* disk, uint8_t* outputBuffer) {
         outputBuffer += g_BootSector.sectorsPerCluster * g_BootSector.bytesPerSector;
 
         uint32_t fatIndex = currentCluster * TWELVE_BITS_CONVERSION;
+        printf("G_FAT VALUE: %u", *g_Fat);
         if (currentCluster % 2 == 0) {
             currentCluster = (*(uint16_t*)(g_Fat + fatIndex)) & 0x0FFF;
         } else {

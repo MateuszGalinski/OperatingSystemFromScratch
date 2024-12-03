@@ -13,3 +13,5 @@ typedef uint8_t bool;
 
 #define False 0
 #define True 1
+
+#define NULL ((void*)0)

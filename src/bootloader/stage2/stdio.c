@@ -14,19 +14,16 @@ void puts(const char* str){
 
 #define RADIX_DEC 10
 
-// typedef enum printState{
-//     PRINT_NORMAL = 0,
-//     PRINT_SPEC = 1,
-// } printState;
+typedef enum printState{
+    PRINT_NORMAL = 0,
+    PRINT_SPEC = 1,
+} printState;
 
-#define PRINT_NORMAL 0
-#define PRINT_SPEC 1
-
-// int* printf_number(int* argp, bool sign);
+int* printf_number(int* argp, bool sign);
 
 void _cdecl printf(const char* fmt, ...){
     int* argp = (int*)&fmt;
-    uint8_t currentState = PRINT_NORMAL;
+    printState currentState = PRINT_NORMAL;
     bool sign = False;
 
     argp++;
@@ -50,14 +47,14 @@ void _cdecl printf(const char* fmt, ...){
                         puts(*(const char **)argp);
                         argp++;
                         break;
-                    // case 'd':
-                    //     sign = True;
-                    //     printf_number(argp, sign);
-                    //     break;
-                    // case 'u':
-                    //     sign = False;
-                    //     printf_number(argp, sign);
-                    //     break;
+                    case 'd':
+                        sign = True;
+                        argp = printf_number(argp, sign);
+                        break;
+                    case 'u':
+                        sign = False;
+                        argp = printf_number(argp, sign);
+                        break;
                     case '%': 
                         putc('%');
                         break;    
@@ -100,8 +97,7 @@ int* printf_number(int* argp, bool sign){
 
     do {
         uint32_t rem;
-        rem = number % RADIX_DEC
-        // x86_div64_32(number, RADIX_DEC, &number, &rem);
+        x86_div64_32(number, RADIX_DEC, &number, &rem);
         buffer[pos++] = g_HexChars[rem];
     } while (number > 0);
 

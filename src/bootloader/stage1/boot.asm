@@ -28,7 +28,7 @@ ebr_drive_number:           db 0
                             db 0 ; reserved
 ebr_signature:              db 29h
 ebr_volume_id:              db 12h, 34h, 56h, 78h
-ebr_volume_label:           db 'MY     OS'        ; 11 bytes, padded with spaces
+ebr_volume_label:           db 'MY       OS'        ; 11 bytes, padded with spaces
 ebr_system_id:              db 'FAT12   '           ; 8 bytes
 
 
@@ -151,19 +151,20 @@ start:
     call disk_read
 
     ; read stage2
-    mov bx, stage2_load_segment
+    mov bx, STAGE2_LOAD_SEGMENT
     mov es, bx
-    mov bx, stage2_load_offset
+    mov bx, STAGE2_LOAD_OFFSET
 
 .load_stage2_loop:
-
+    
     mov ax, [stage2_cluster]
     add ax, 31
+
     mov cl, 1
     mov dl, [ebr_drive_number]
     call disk_read
 
-    add bx, [bdb_reserved_sectors]
+    add bx, [bdb_bytes_per_sector]
 
     ; compute next cluster
     mov ax, [stage2_cluster]
@@ -184,7 +185,7 @@ start:
     jmp .next_cluster_after
 
 .even:
-    add ax, 0x0FFF
+    and ax, 0x0FFF
 
 .next_cluster_after:
     cmp ax, 0x0FF8
@@ -195,11 +196,11 @@ start:
 
 .read_finished:
     mov dl, [ebr_drive_number]
-    mov ax, stage2_load_segment
+    mov ax, STAGE2_LOAD_SEGMENT
     mov ds, ax
     mov es, ax
     
-    jmp stage2_load_segment:stage2_load_offset
+    jmp STAGE2_LOAD_SEGMENT:STAGE2_LOAD_OFFSET
 
     jmp wait_key_and_reboot
 
@@ -232,19 +233,21 @@ wait_key_and_reboot:
 print:
     push si
     push ax
+    push bx
 
 .loop:
     lodsb ; loads al
     or al, al
     jz .done ; jumps if or al, al is invoked for null character
 
-    mov ah, 0x0e ; Chooses printing to screen function of bios for next 10h interrupt(not to be confused with mine)
+    mov ah, 0x0E ; Chooses printing to screen function of bios for next 10h interrupt(not to be confused with mine)
     mov bh, 0 ; no need to put ascii to AL as we do it in earlier lines
     int 10h ; Calling of a print function of bios
 
     jmp .loop
 
 .done:
+    pop bx
     pop ax
     pop si
     ret
@@ -348,14 +351,15 @@ disk_reset:
     popa
     ret
 
+debug: db 'XD', ENDL, 0
 msg_loading: db 'Loading...', ENDL, 0
 msg_read_failed: db 'Read failed', ENDL, 0
 file_stage2_bin: db 'STAGE2  BIN'
-msg_stage2_not_found: db 'Stage 2 bootloader not found'
+msg_stage2_not_found: db 'Stage 2 not found'
 stage2_cluster: dw 0
 
-stage2_load_segment: equ 0x2000
-stage2_load_offset: equ 0
+STAGE2_LOAD_SEGMENT: equ 0x2000
+STAGE2_LOAD_OFFSET: equ 0
 
 times 510 - ($ - $$) db 0 ; signature write
 dw 0AA55h
